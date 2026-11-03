@@ -1,0 +1,21 @@
+# Weights, data, caches: never in git
+*.pth
+*.pt
+*.ckpt
+*.npy
+*.npz
+*.nii
+*.nii.gz
+*.dcm
+*.zip
+cache/
+cache_*/
+archive/
+data/
+runs/
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.log
+slurm-*.out

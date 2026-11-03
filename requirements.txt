@@ -1,0 +1,12 @@
+# SarcomaNet — Tri-Head 3D Sarcoma AI
+# Install: pip install -r requirements.txt
+
+torch>=2.0.0
+numpy>=1.24.0,<2.0.0
+pandas>=2.0.0
+scipy>=1.10.0
+scikit-learn>=1.2.0
+pydicom>=2.4.0
+Pillow>=10.0.0
+openpyxl>=3.1.0
+h5py>=3.8.0
