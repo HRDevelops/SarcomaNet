@@ -51,6 +51,12 @@ All commands run from the repository root. Outputs go to `../runs`, `../results`
 | E9 | `configs/E9_*.json` | Single-task models |
 | E10 | `seg_baselines.py`, `configs/E10_*.json`, `nnunet_e10.py` | MONAI U-Net / SegResNet / SwinUNETR, nnU-Net |
 | E11 | `e11_nested.py`, `configs/E11/` | Number of epochs chosen by nested CV |
+| LMFS | `configs/E0_lmfs.json`, `slurm/lmfs_baselines.sbatch` | Sensitivity analysis: lung-metastasis-free survival endpoint |
+| E12 | `e12_nnunet_features.py`, `e12_heads.py`, `slurm/e12.sbatch` | Pilot: nnU-Net encoder features with grade and survival heads |
+
+**Figures.** `tools/make_figures.py --style v3` draws the training-curve, segmentation and Kaplan–Meier figures
+from the run outputs; `tools/otf2ttf.py` converts the Nimbus Sans font to TrueType so it embeds cleanly in PDF
+(set `SARCOMA_FONT_DIR` to its output folder). `tools/headline_table.py` builds the main results table.
 
 `slurm/` holds the Slurm scripts used on the HPC cluster (edit the account, partition and module lines for
 your cluster). `tests/` holds known-answer tests for the metrics and losses: `python -m pytest tests`.
