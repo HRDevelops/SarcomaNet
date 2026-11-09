@@ -1,4 +1,4 @@
-# SarcomaNet: code for the revised evaluation
+# SarcomaNet
 
 Code for *SarcomaNet* (manuscript ARRAY-D-26-03543, revised version): a multi-task 3D network for soft tissue
 sarcoma segmentation, FNCLCC grading and overall-survival risk from T2FS MRI, FDG-PET and CT, evaluated under a
