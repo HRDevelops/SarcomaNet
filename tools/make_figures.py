@@ -140,6 +140,70 @@ def seg_grid_figure(runs, cache, pids, out, ncols=4, name="Fig_10_segmentation_v
     plt.close(fig)
 
 
+def seg_error_figure(runs, cache, pids, out, name="Fig_10_segmentation_v5.pdf", per_row=2):
+    """High-contrast segmentation figure: per patient T2FS | reference | prediction (+Dice) | error map
+    (TP green, FP red, FN blue), cropped around the tumour. Seed-42 final-epoch out-of-fold predictions."""
+    from matplotlib.patches import Patch
+    GT_C, PR_C, TP_C, FP_C, FN_C = "#2ECC71", "#E74C3C", "#2ECC71", "#E74C3C", "#3B6FD8"
+    n = len(pids); rows = int(np.ceil(n / per_row))
+    ratios = []
+    for k in range(per_row):
+        ratios += [1, 1, 1, 1] + ([0.18] if k < per_row - 1 else [])
+    fig, axs = plt.subplots(rows, len(ratios), figsize=(7.2, rows * 0.95 + 0.55),
+                            gridspec_kw={"width_ratios": ratios, "wspace": 0.04, "hspace": 0.22})
+    axs = np.atleast_2d(axs)
+    for ax in axs.flat:
+        ax.axis("off")
+
+    def rgba(mask, color, alpha):
+        c = matplotlib.colors.to_rgba(color)
+        a = np.zeros(mask.shape + (4,)); a[mask] = (*c[:3], alpha)
+        return a
+
+    for idx, pid in enumerate(pids):
+        r, k = divmod(idx, per_row)
+        c0 = k * 5
+        img = np.load(cache / pid / "image.npy")[0]                       # T2FS (mask reference series)
+        gt = np.load(cache / pid / "mask.npy").astype(bool)
+        pr = np.load(sorted(runs.glob(f"seed42/fold*/oof_seg/{pid}.npz"))[0])["pred"].astype(bool)
+        dice = 2 * (pr & gt).sum() / (pr.sum() + gt.sum())
+        z = int(gt.sum((1, 2)).argmax())
+        im, g, p = img[z], gt[z], pr[z]
+        ys, xs = np.where(g | p)
+        cy, cx = (ys.min() + ys.max()) / 2, (xs.min() + xs.max()) / 2
+        half = max(ys.max() - ys.min(), xs.max() - xs.min()) / 2 * 1.3 + 4
+        half = int(min(max(half, 22), min(im.shape) / 2))
+        y0 = int(np.clip(round(cy - half), 0, im.shape[0] - 2 * half)); x0 = int(np.clip(round(cx - half), 0, im.shape[1] - 2 * half))
+        sl = (slice(y0, y0 + 2 * half), slice(x0, x0 + 2 * half))
+        im, g, p = im[sl], g[sl], p[sl]
+        panels = axs[r, c0:c0 + 4]
+        for ax in panels:
+            ax.imshow(im, cmap="gray", vmin=0, vmax=1, interpolation="nearest")
+        panels[1].imshow(rgba(g, GT_C, 0.40), interpolation="nearest")
+        panels[1].contour(g, levels=[0.5], colors=[GT_C], linewidths=0.9)
+        panels[2].imshow(rgba(p, PR_C, 0.40), interpolation="nearest")
+        if p.any():
+            panels[2].contour(p, levels=[0.5], colors=[PR_C], linewidths=0.9)
+        err = rgba(g & p, TP_C, 0.70) + rgba(p & ~g, FP_C, 0.80) + rgba(g & ~p, FN_C, 0.75)
+        panels[3].imshow(err, interpolation="nearest")
+        badge = "#2E9E5B" if dice >= 0.65 else ("#E08A1E" if dice >= 0.40 else "#C0392B")
+        panels[2].text(0.97, 0.04, f"Dice {dice:.2f}", transform=panels[2].transAxes, ha="right", va="bottom",
+                       fontsize=5.5, color="white", fontweight="bold",
+                       bbox={"boxstyle": "round,pad=0.2", "fc": badge, "ec": "none"})
+        panels[0].text(0.03, 0.96, pid.replace("_", " "), transform=panels[0].transAxes, ha="left", va="top",
+                       fontsize=5.5, color="white", fontweight="bold")
+        if r == 0:
+            for ax, t in zip(panels, ("T2FS", "Reference", "Prediction", "Error map")):
+                ax.set_title(t, fontsize=7, color=INK, pad=3)
+    h = [Patch(facecolor=TP_C, label="True positive"), Patch(facecolor=FP_C, label="False positive"),
+         Patch(facecolor=FN_C, label="False negative"),
+         plt.Line2D([], [], color=GT_C, label="Reference contour"), plt.Line2D([], [], color=PR_C, label="Prediction contour")]
+    fig.legend(handles=h, loc="lower center", ncol=5, frameon=False, fontsize=6.5, bbox_to_anchor=(0.5, 0.0))
+    fig.subplots_adjust(left=0.01, right=0.99, top=1 - 0.28 / (rows * 0.95 + 0.55), bottom=0.38 / (rows * 0.95 + 0.55))
+    fig.savefig(safe_out(out / name))
+    plt.close(fig)
+
+
 def km_figure(runs, out, name="Fig_11_km_v2.pdf"):
     from lifelines import KaplanMeierFitter
     from lifelines.statistics import logrank_test
@@ -172,8 +236,14 @@ def main():
     ap.add_argument("--out", required=True); ap.add_argument("--seg_pids", nargs="+", required=True)
     ap.add_argument("--style", choices=["v2", "v3"], default="v2",
                     help="v3: diagram-matched style; writes Fig_09_training_v3, Fig_10_segmentation_v4 (grid), Fig_11_km_v3")
+    ap.add_argument("--seg_error_only", action="store_true",
+                    help="with --style v3: only the high-contrast segmentation figure (Fig_10_segmentation_v5.pdf)")
     a = ap.parse_args()
     runs, out = Path(a.runs), Path(a.out)
+    if a.style == "v3" and a.seg_error_only:
+        use_v3_style()
+        seg_error_figure(runs, Path(a.cache), a.seg_pids, out)
+        return
     if a.style == "v3":
         use_v3_style()
         training_figure(runs, out, "Fig_09_training_v3.pdf")
